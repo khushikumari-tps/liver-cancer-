@@ -6,16 +6,6 @@
   var $  = function (s, c) { return (c || document).querySelector(s); };
   var $$ = function (s, c) { return Array.prototype.slice.call((c || document).querySelectorAll(s)); };
 
-  /* ---------- brand mark shrinks on scroll ---------- */
-  var brandmark = $('#brandmark');
-  if (brandmark) {
-    var syncBrand = function () {
-      brandmark.classList.toggle('is-compact', window.scrollY > 80);
-    };
-    window.addEventListener('scroll', syncBrand, { passive: true });
-    syncBrand();
-  }
-
   /* ---------- mobile menu drawer ---------- */
   var burger = $('#burger');
   var drawer = $('#drawer');
@@ -500,26 +490,60 @@
     tlSync();
   }
 
-  /* ---------- quick-start modal ---------- */
+  /* ---------- appointment modal ----------
+     Same form and same lead as the hospital site's liver / HPB page: the
+     request goes to the CRM through js/crm-lead.js (keyed in
+     js/crm-config.js) and the visitor lands on thank-you.html. If the CRM
+     is switched off or unreachable, the request is handed to WhatsApp
+     instead, so a lead is never dropped. */
+  var SERVICE = 'HPB Surgery';
+  var SLUG = 'liver-cancer-hpb-surgery';
+
   var modal = $('#quick-modal');
-  var quickForm = $('#quick-form');
-  var quickPhone = $('#quick-phone');
-  var quickError = $('#quick-error');
+  var apptForm = $('#appt-form');
+  var apptStatus = $('#appt-status');
   var lastFocus = null;
 
-  function normalisePhone(value) {
-    return String(value || '').replace(/[^0-9]/g, '').replace(/^(91|0)(?=\d{10}$)/, '');
+  if (apptForm) {
+    var timeSelect = $('#appt-time', apptForm);
+    TIMES.forEach(function (t) {
+      var o = document.createElement('option');
+      o.value = t;
+      o.textContent = label12(t);
+      timeSelect.appendChild(o);
+    });
+    $('#appt-date', apptForm).min = isoOf(new Date());
+  }
+
+  function setStatus(text, ok) {
+    if (!apptStatus) return;
+    apptStatus.textContent = text || '';
+    apptStatus.classList.toggle('is-visible', !!text);
+    apptStatus.classList.toggle('is-ok', !!ok);
+  }
+
+  /* carry the widget's picks into the form, so tapping Book after choosing
+     a location, date and time does not ask for them twice */
+  function prefillFromWidget() {
+    if (!apptForm) return;
+    if (picked.location) apptForm.elements.location.value = picked.location;
+    if (picked.date) apptForm.elements.date.value = picked.date;
+    if (picked.time) apptForm.elements.time.value = picked.time;
   }
 
   function openModal(trigger) {
     if (!modal) return;
     lastFocus = trigger || document.activeElement;
+    prefillFromWidget();
+    setStatus('');
     modal.hidden = false;
     modal.classList.add('is-open');
     document.body.classList.add('modal-open');
     document.documentElement.classList.add('modal-open');
-    if (quickError) { quickError.textContent = ''; quickError.classList.remove('is-visible'); }
-    setTimeout(function () { if (quickPhone) quickPhone.focus(); }, 60);
+    setTimeout(function () {
+      var first = apptForm && apptForm.elements.name;
+      if (first) first.focus();
+    }, 60);
   }
 
   function closeModal() {
@@ -531,30 +555,22 @@
     if (lastFocus && lastFocus.focus) lastFocus.focus();
   }
 
-  function sendRequest(phone) {
-    var lines = [
-      'Liver cancer / HPB surgery consultation request \u2014 Advitya Healthcares',
-      'Mobile: +91 ' + phone,
-      'Preferred location: ' + picked.location
-    ];
-    if (picked.date) lines.push('Preferred date: ' + picked.date);
-    if (picked.time) lines.push('Preferred time: ' + label12(picked.time));
-    window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(lines.join('\n')),
-      '_blank', 'noopener');
-  }
-
-  $$('[data-book]').forEach(function (el) {
-    el.addEventListener('click', function (e) {
-      if (el.hasAttribute('data-loc')) {
-        var value = el.getAttribute('data-loc');
-        picked.location = value;
-        var radio = $('input[name="w-location"][value="' + value + '"]');
-        if (radio) radio.checked = true;
-      }
-      e.preventDefault();
-      openModal(el);
-    });
+  // every "Book Appointment" on the page opens the form where the visitor is
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest ? e.target.closest('[data-book], a[href="#book"]') : null;
+    if (!el || !modal) return;
+    if (el.hasAttribute('data-loc')) {
+      var value = el.getAttribute('data-loc');
+      picked.location = value;
+      var radio = $('input[name="w-location"][value="' + value + '"]');
+      if (radio) radio.checked = true;
+    }
+    e.preventDefault();
+    openModal(el);
   });
+
+  // arriving from the thank-you page's "Book Appointment" link
+  if (modal && location.hash === '#book') openModal();
 
   if (modal) {
     $$('[data-modal-close]', modal).forEach(function (btn) {
@@ -567,7 +583,7 @@
       if (!modal.classList.contains('is-open')) return;
       if (e.key === 'Escape') { closeModal(); return; }
       if (e.key === 'Tab') {
-        var focusable = $$('button, input, a[href]', modal).filter(function (n) { return !n.disabled; });
+        var focusable = $$('button, input, select, textarea, a[href]', modal).filter(function (n) { return !n.disabled; });
         if (!focusable.length) return;
         var first = focusable[0], last = focusable[focusable.length - 1];
         if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
@@ -576,24 +592,134 @@
     });
   }
 
-  if (quickForm) {
-    quickForm.addEventListener('submit', function (e) {
-      e.preventDefault();
-      var digits = normalisePhone(quickPhone.value);
-      if (!/^[6-9][0-9]{9}$/.test(digits)) {
-        quickError.textContent = 'Please enter a valid 10-digit Indian mobile number.';
-        quickError.classList.add('is-visible');
-        quickPhone.focus();
-        return;
+  if (apptForm) {
+    var clearError = function (field) {
+      field.removeAttribute('aria-invalid');
+      var holder = field.closest('.appt-field') || field.closest('.appt-consent');
+      var msg = holder && $('.appt-err', holder);
+      if (msg) msg.remove();
+      field.removeAttribute('aria-describedby');
+    };
+
+    var showError = function (field, text) {
+      field.setAttribute('aria-invalid', 'true');
+      var holder = field.closest('.appt-field') || field.closest('.appt-consent');
+      if (!holder) return;
+      var msg = $('.appt-err', holder);
+      if (!msg) {
+        msg = document.createElement('p');
+        msg.className = 'appt-err';
+        msg.id = 'err-' + (field.id || field.name);
+        holder.appendChild(msg);
       }
-      quickError.textContent = 'Opening WhatsApp with your request \u2026';
-      quickError.classList.add('is-visible', 'is-ok');
-      sendRequest(digits);
-      setTimeout(function () {
-        quickError.classList.remove('is-ok');
-        quickForm.reset();
-        closeModal();
-      }, 1400);
+      msg.textContent = text;
+      field.setAttribute('aria-describedby', msg.id);
+    };
+
+    var messageFor = function (field) {
+      if (field.validity.valueMissing) {
+        return field.type === 'checkbox'
+          ? 'Please confirm we may contact you about this enquiry.'
+          : 'This field is needed so the team can reach you.';
+      }
+      if (field.validity.patternMismatch || field.validity.typeMismatch) {
+        return field.name === 'phone'
+          ? 'Enter a phone number we can call you back on.'
+          : 'Please check this entry.';
+      }
+      return field.validationMessage || 'Please check this entry.';
+    };
+
+    var validate = function () {
+      var first = null;
+      $$('input, select, textarea', apptForm).forEach(function (f) {
+        clearError(f);
+        if (f.checkValidity()) return;
+        showError(f, messageFor(f));
+        if (!first) first = f;
+      });
+      if (first) first.focus();
+      return !first;
+    };
+
+    apptForm.addEventListener('input', function (e) {
+      if (e.target && e.target.getAttribute('aria-invalid') === 'true') clearError(e.target);
+    });
+    apptForm.addEventListener('change', function (e) {
+      if (e.target && e.target.getAttribute('aria-invalid') === 'true') clearError(e.target);
+    });
+
+    var toThankYou = function () {
+      window.location.href = 'thank-you.html?service=' + encodeURIComponent(SLUG);
+    };
+
+    var byWhatsApp = function (p) {
+      var lines = [
+        'Liver cancer / HPB surgery consultation request — Advitya Healthcares',
+        'Name: ' + p.name,
+        'Phone: ' + p.phone,
+        'Preferred location: ' + p.location
+      ];
+      if (p.date) lines.push('Preferred date: ' + p.date);
+      if (p.time) lines.push('Preferred time: ' + label12(p.time));
+      if (p.condition) lines.push('Surgery / condition: ' + p.condition);
+      if (p.message) lines.push('Message: ' + p.message);
+      window.open('https://wa.me/' + WA_NUMBER + '?text=' + encodeURIComponent(lines.join('\n')),
+        '_blank', 'noopener');
+    };
+
+    apptForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      setStatus('');
+      if (!validate()) return;
+
+      var fd = new FormData(apptForm);
+      var p = {
+        name: (fd.get('name') || '').trim(),
+        phone: (fd.get('phone') || '').trim(),
+        location: fd.get('location') || '',
+        date: fd.get('date') || '',
+        time: fd.get('time') || '',
+        condition: (fd.get('condition') || '').trim(),
+        message: (fd.get('message') || '').trim(),
+        consent: !!fd.get('consent')
+      };
+
+      var button = $('button[type="submit"]', apptForm);
+      var label = button.textContent;
+      button.disabled = true;
+      button.setAttribute('aria-busy', 'true');
+      button.textContent = 'Sending your request…';
+
+      var sent = (window.AdvCRM && window.AdvCRM.enabled())
+        ? window.AdvCRM.post({
+            name: p.name,
+            phone: p.phone,
+            email: '',
+            city: p.location,
+            product: SERVICE,
+            title: 'Consultation request',
+            lines: {
+              'Service': SERVICE,
+              'Page': SLUG,
+              'Preferred location': p.location,
+              'Condition': p.condition,
+              'Preferred date': p.date,
+              'Preferred time': p.time ? label12(p.time) : '',
+              'Message': p.message,
+              'Consent to contact': p.consent ? 'Yes' : 'No'
+            }
+          })
+        : Promise.resolve(false);
+
+      sent.then(function (ok) {
+        if (ok) { toThankYou(); return; }
+        button.disabled = false;
+        button.removeAttribute('aria-busy');
+        button.textContent = label;
+        setStatus('We could not reach our booking system, so WhatsApp has opened with your request. Please press Send, or call +91 92112 21551.');
+        byWhatsApp(p);
+      });
     });
   }
 

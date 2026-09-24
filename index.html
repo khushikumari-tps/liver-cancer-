@@ -175,9 +175,8 @@
 
 <a class="sr-only" href="#main">Skip to main content</a>
 
-<a class="brandmark" id="brandmark" href="#top" aria-label="Advitya Healthcares - Liver Cancer &amp; HPB Surgery">
-  <img src="images/advitya_logo_mark.png" alt="Advitya Healthcares logo" width="147" height="126">
-  <span class="brandmark__text"><b>Advitya Healthcares</b><small>Science for Humanity</small></span>
+<a class="sitelogo" href="#top" aria-label="Advitya Healthcares - Liver Cancer &amp; HPB Surgery">
+  <img src="images/advitya_logo_nav.png" alt="Advitya Healthcares" width="234" height="200">
 </a>
 
 <div class="mtools" id="mtools">
@@ -1048,11 +1047,6 @@
 
     <div class="footer__bottom">
       <span>&copy; <span id="year">2026</span> Advitya Healthcares. All rights reserved.</span>
-      <nav class="footer__legal" aria-label="Legal">
-        <a href="https://www.advityahealthcares.com/">Privacy Policy</a>
-        <a href="https://www.advityahealthcares.com/">Terms &amp; Conditions</a>
-        <a href="https://www.advityahealthcares.com/">Medical Disclaimer</a>
-      </nav>
     </div>
   </div>
 </footer>
@@ -1064,23 +1058,67 @@
   <a class="is-book" href="#book" data-book><svg><use href="#i-calendar"/></svg>Book Appointment</a>
 </nav>
 
-<!-- ============ QUICK-START MODAL ============ -->
+<!-- ============ APPOINTMENT MODAL ============
+     Same form and same CRM lead as the Advitya hospital site's liver /
+     HPB page: js/crm-lead.js posts it, js/crm-config.js holds the key. -->
 <div class="modal" id="quick-modal" role="dialog" aria-modal="true" aria-labelledby="quick-title" hidden>
-  <div class="modal__card" role="document">
+  <div class="modal__card modal__card--form" role="document">
     <button class="modal__close" type="button" data-modal-close aria-label="Close"><svg><use href="#i-close"/></svg></button>
 
-    <h2 id="quick-title">Hello, Guest!</h2>
-    <p class="modal__sub">Quick booking using <b>Mobile Number</b>.</p>
+    <h2 id="quick-title">Book your surgical consultation</h2>
+    <p class="modal__sub">Six fields, nothing clinical. We will call you back to confirm.</p>
 
-    <form id="quick-form" novalidate>
-      <label class="sr-only" for="quick-phone">Mobile number</label>
-      <div class="modal__field">
-        <span class="modal__prefix">+91</span>
-        <input id="quick-phone" name="quick-phone" type="tel" inputmode="numeric" autocomplete="tel-national" maxlength="14" placeholder="">
+    <form class="appt-form" id="appt-form" novalidate>
+      <div class="appt-form__row">
+        <div class="appt-field">
+          <label for="appt-name">Name</label>
+          <input id="appt-name" name="name" type="text" autocomplete="name" required>
+        </div>
+        <div class="appt-field">
+          <label for="appt-phone">Phone number</label>
+          <input id="appt-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" pattern="[0-9+ \(\)\-]{7,}" required>
+        </div>
       </div>
-      <p class="modal__error" id="quick-error" role="alert"></p>
 
-      <button class="modal__go" type="submit">Get Started</button>
+      <div class="appt-form__row">
+        <div class="appt-field">
+          <label for="appt-date">Preferred date</label>
+          <input id="appt-date" name="date" type="date">
+        </div>
+        <div class="appt-field">
+          <label for="appt-time">Preferred time</label>
+          <select id="appt-time" name="time">
+            <option value="">No preference</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="appt-field">
+        <label for="appt-location">Preferred location</label>
+        <select id="appt-location" name="location">
+          <option value="Kolkata">Advitya Healthcares &mdash; Kolkata</option>
+          <option value="Baruipur">Advitya Hospital, Baruipur</option>
+        </select>
+      </div>
+
+      <div class="appt-field">
+        <label for="appt-condition">Surgery / condition</label>
+        <input id="appt-condition" name="condition" type="text" value="Liver Cancer &amp; HPB Surgery">
+      </div>
+
+      <div class="appt-field">
+        <label for="appt-message">Message</label>
+        <textarea id="appt-message" name="message" rows="3" placeholder="Anything you would like the team to know before the call."></textarea>
+      </div>
+
+      <label class="appt-consent">
+        <input type="checkbox" name="consent" required>
+        <span>I agree to be contacted about this enquiry. Please do not include detailed medical information in this form.</span>
+      </label>
+
+      <p class="modal__error" id="appt-status" role="alert"></p>
+
+      <button class="modal__go" type="submit">Request appointment</button>
       <button class="modal__back" type="button" data-modal-close>Go Back</button>
     </form>
   </div>
@@ -1100,6 +1138,8 @@ function googleTranslateElementInit(){
 </script>
 <script src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" defer></script>
 
+<script src="js/crm-config.js" defer></script>
+<script src="js/crm-lead.js" defer></script>
 <script src="js/main.js" defer></script>
 </body>
 </html>
